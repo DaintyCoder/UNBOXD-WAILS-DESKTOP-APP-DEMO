@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*' # Trigger on tags like v1.0.0, v2.3.1, etc.
+  workflow_dispatch: # Allows manual triggering from the Actions tab
 
 env:
   NODE_OPTIONS: "--max-old-space-size=4096" # Prevents out-of-memory issues
@@ -13,12 +14,18 @@ jobs:
     strategy:
       fail-fast: false # Continue building other platforms even if one fails
       matrix:
-        name: ['QRCodeGenerator'] # Single app name for all platforms
-        platform: ['linux/amd64', 'windows/amd64', 'darwin/universal']
-        os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
-        # Ensure the order of platforms and os matches
+        build:
+          - name: 'QRCodeGenerator'
+            platform: 'linux/amd64'
+            os: 'ubuntu-latest'
+          - name: 'QRCodeGenerator'
+            platform: 'windows/amd64'
+            os: 'windows-latest'
+          - name: 'QRCodeGenerator'
+            platform: 'darwin/universal'
+            os: 'macos-latest'
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.build.os }}
     steps:
       # Step 1: Checkout the repository
       - name: Checkout code
@@ -30,21 +37,36 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22' # Use the latest stable Go version or match your local version
+          go-version: '1.22'
 
-      # Step 3: Build the Wails app
+      # Step 3: Set up Node.js for frontend build
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Match your local Node.js version if different
+          cache: 'npm' # Cache npm dependencies
+          cache-dependency-path: frontend/package-lock.json
+
+      # Step 4: Install frontend dependencies
+      - name: Install npm dependencies
+        run: |
+          cd frontend
+          npm ci # Use ci for consistent installs
+
+      # Step 5: Build the Wails app
       - name: Build Wails app
         uses: dAppServer/wails-build-action@v2.2
         id: build
         with:
-          build-name: ${{ matrix.name }}
-          build-platform: ${{ matrix.platform }}
-          package: true # Package the app into a distributable format
-          go-version: '1.22' # Match the Go version above
+          build-name: ${{ matrix.build.name }}
+          build-platform: ${{ matrix.build.platform }}
+          package: true # Package into distributable format
+          go-version: '1.22'
 
-      # Step 4: Upload artifacts
+      # Step 6: Upload artifacts
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}-${{ matrix.platform }}
+          name: ${{ matrix.build.name }}-${{ matrix.build.platform }}
           path: build/bin/*
+          if-no-files-found: warn # Warn instead of fail if no artifacts
