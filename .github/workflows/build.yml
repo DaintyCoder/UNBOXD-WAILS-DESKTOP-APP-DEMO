@@ -1,4 +1,4 @@
-name: Build QR Code App
+name: Build QR App Cross-Platform
 
 on:
   push:
@@ -6,63 +6,64 @@ on:
   workflow_dispatch:
 
 env:
-  NODE_OPTIONS: "--max-old-space-size=4096"  # Prevent OOM issues
+  NODE_OPTIONS: "--max-old-space-size=4096"
 
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        build:
+        platform:
           - name: 'qr-code-app'
-            platform: 'linux/amd64'
+            target: 'linux/amd64'
             os: 'ubuntu-latest'
           - name: 'qr-code-app'
-            platform: 'windows/amd64'
+            target: 'windows/amd64'
             os: 'windows-latest'
           - name: 'qr-code-app'
-            platform: 'darwin/amd64'
+            target: 'darwin/amd64'
             os: 'macos-latest'
-    runs-on: ${{ matrix.build.os }}
+    runs-on: ${{ matrix.platform.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for version info if needed
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'  # Match your local Node 22.12.0
-          cache: 'npm'  # Cache npm dependencies
+          node-version: '22'
+          cache: 'npm'
           cache-dependency-path: 'frontend/package-lock.json'
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21'  # Match your local Go version
+          go-version: '1.21'
 
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        shell: bash {0}  # Cross-platform shell
 
       - name: Install Linux Dependencies
-        if: matrix.build.platform == 'linux/amd64'
+        if: matrix.platform.target == 'linux/amd64'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev build-essential
-          sudo ln -s /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc || echo "Symlink already exists"
+          sudo ln -s /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc || echo "Symlink exists"
 
       - name: Install Frontend Dependencies
         run: |
           cd frontend
-          npm ci  # Use ci for consistent installs (requires package-lock.json)
+          npm ci || npm install  # Fallback if package-lock.json is missing
           npm run build --verbose
 
       - name: Build Wails App
         uses: dAppServer/wails-build-action@v2.2
         with:
-          build-name: ${{ matrix.build.name }}
-          build-platform: ${{ matrix.build.platform }}
+          build-name: ${{ matrix.platform.name }}
+          build-platform: ${{ matrix.platform.target }}
           package: true
           go-version: '1.21'
           args: '--verbose'
@@ -71,18 +72,18 @@ jobs:
         if: failure()
         run: |
           echo "Build failed. Debugging..."
-          node --version
-          go version
-          npm --version
+          node --version || echo "Node not found"
+          go version || echo "Go not found"
+          npm --version || echo "npm not found"
           wails doctor || echo "Wails doctor failed"
-          ls -la || dir  # Linux/macOS or Windows
-          cat frontend/package.json || type frontend\package.json
+          ls -la || dir || echo "Dir listing failed"
+        shell: bash {0}
 
       - name: Upload Artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: qr-code-app-${{ matrix.build.platform }}
+          name: qr-code-app-${{ matrix.platform.target }}
           path: |
             build/bin/*
             *.log
