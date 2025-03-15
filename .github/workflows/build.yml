@@ -14,7 +14,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        name: ['QRCodeGenerator'] # Single app name
         platform: ['linux/amd64', 'windows/amd64', 'darwin/universal']
         os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
 
@@ -40,32 +39,34 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      # Step 4: Install npm dependencies
+      # Step 4: Install Wails CLI
+      - name: Install Wails CLI
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.8.0
+
+      # Step 5: Install npm dependencies
       - name: Install npm dependencies
         run: |
           cd frontend
           npm ci
+          npm run build
 
-      # Step 5: Build Wails app
+      # Step 6: Build Wails app
       - name: Build Wails app
-        uses: dAppServer/wails-build-action@v2.2
-        with:
-          build-name: ${{ matrix.name }}
-          build-platform: ${{ matrix.platform }}
-          package: true
-          go-version: '1.22'
-          wails-version: 'v2.8.0'
+        run: |
+          wails build -platform ${{ matrix.platform }} -o QRCodeGenerator
+        env:
+          GO111MODULE: on
 
-      # Step 6: Debug build output
+      # Step 7: Debug build output
       - name: List build output
         run: |
           ls -la build/bin || dir build\bin
-        shell: bash {0} # Cross-platform
+        shell: bash {0}
 
-      # Step 7: Upload artifacts
+      # Step 8: Upload artifacts
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.name }}-${{ matrix.platform }}
+          name: QRCodeGenerator-${{ matrix.platform }}
           path: build/bin/*
           if-no-files-found: error
