@@ -10,6 +10,7 @@ jobs:
     strategy:
       matrix:
         platform: [linux/amd64, windows/amd64, darwin/amd64]
+      fail-fast: false  # Allow all platforms to run even if one fails
     runs-on: ${{ matrix.platform == 'darwin/amd64' && 'macos-latest' || 'ubuntu-latest' }}
     steps:
     - uses: actions/checkout@v4
@@ -19,35 +20,51 @@ jobs:
         go-version: '1.21'
     - name: Install Wails
       run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+      shell: bash
     - name: Install Linux Dependencies
       if: matrix.platform == 'linux/amd64'
-      run: sudo apt-get update && sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+      shell: bash
     - name: Install Windows Cross-Compile Tools
       if: matrix.platform == 'windows/amd64'
-      run: sudo apt-get update && sudo apt-get install -y mingw-w64
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y mingw-w64
+      shell: bash
     - name: Install Frontend Dependencies
-      run: cd frontend && npm install
-    - name: Build
-      run: wails build -platform ${{ matrix.platform }}
+      run: |
+        cd frontend
+        npm install --verbose  # Verbose output for debugging
+      shell: bash
+    - name: Build Application
+      run: |
+        wails build -platform ${{ matrix.platform }} -verbose  # Verbose output for debugging
+      shell: bash
     - name: Package Linux
       if: matrix.platform == 'linux/amd64'
       run: |
         mkdir qr-code-app-linux-amd64
         cp build/bin/qr-code-app qr-code-app-linux-amd64/
         tar -czvf qr-code-app-linux-amd64.tar.gz qr-code-app-linux-amd64
+      shell: bash
     - name: Package Windows
       if: matrix.platform == 'windows/amd64'
       run: |
         mkdir qr-code-app-windows-amd64
         cp build/bin/qr-code-app.exe qr-code-app-windows-amd64/
         zip -r qr-code-app-windows-amd64.zip qr-code-app-windows-amd64
+      shell: bash
     - name: Package macOS
       if: matrix.platform == 'darwin/amd64'
       run: |
         mkdir qr-code-app-darwin-amd64
         cp build/bin/qr-code-app qr-code-app-darwin-amd64/
         zip -r qr-code-app-darwin-amd64.zip qr-code-app-darwin-amd64
+      shell: bash
     - name: Upload Artifacts
+      if: always()  # Upload even if build fails for debugging
       uses: actions/upload-artifact@v4
       with:
         name: qr-code-app-${{ matrix.platform }}
