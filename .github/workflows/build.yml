@@ -14,29 +14,25 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build:
-          - name: 'QRCodeGenerator'
-            platform: 'linux/amd64'
-            os: 'ubuntu-latest'
-          - name: 'QRCodeGenerator'
-            platform: 'windows/amd64'
-            os: 'windows-latest'
-          - name: 'QRCodeGenerator'
-            platform: 'darwin/universal'
-            os: 'macos-latest'
+        name: ['QRCodeGenerator'] # Single app name
+        platform: ['linux/amd64', 'windows/amd64', 'darwin/universal']
+        os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
 
-    runs-on: ${{ matrix.build.os }}
+    runs-on: ${{ matrix.os }}
     steps:
+      # Step 1: Checkout code
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
+      # Step 2: Set up Go
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
 
+      # Step 3: Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -44,28 +40,32 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
+      # Step 4: Install npm dependencies
       - name: Install npm dependencies
         run: |
           cd frontend
           npm ci
 
+      # Step 5: Build Wails app
       - name: Build Wails app
         uses: dAppServer/wails-build-action@v2.2
         with:
-          build-name: ${{ matrix.build.name }}
-          build-platform: ${{ matrix.build.platform }}
+          build-name: ${{ matrix.name }}
+          build-platform: ${{ matrix.platform }}
           package: true
           go-version: '1.22'
-          wails-version: 'v2.8.0' # Pin to v2.8.0
+          wails-version: 'v2.8.0'
 
-      - name: List build output (debug)
+      # Step 6: Debug build output
+      - name: List build output
         run: |
           ls -la build/bin || dir build\bin
-        shell: bash {0}
+        shell: bash {0} # Cross-platform
 
+      # Step 7: Upload artifacts
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.build.name }}-${{ matrix.build.platform }}
+          name: ${{ matrix.name }}-${{ matrix.platform }}
           path: build/bin/*
           if-no-files-found: error
