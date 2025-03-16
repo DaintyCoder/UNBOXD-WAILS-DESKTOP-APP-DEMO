@@ -1,0 +1,6 @@
+Package: qr-code-app
+Version: 1.0.0
+Architecture: amd64
+Maintainer: Your Name <your@email.com>
+Depends: libgtk-3-0, libwebkit2gtk-4.1-0
+Description: A simple QR code generator desktop application

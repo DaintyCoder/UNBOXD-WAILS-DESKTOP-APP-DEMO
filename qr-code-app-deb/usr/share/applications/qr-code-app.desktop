@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=QR Code Generator
+Exec=/usr/bin/qr-code-app
+Type=Application
+Icon=/usr/share/icons/hicolor/256x256/apps/qr-code-app.png
+Terminal=false
+Categories=Utility;
+Comment=Generate QR codes easily
+
