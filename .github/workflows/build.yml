@@ -14,10 +14,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: ['linux/amd64', 'windows/amd64', 'darwin/universal']
-        os: ['ubuntu-latest', 'windows-latest', 'macos-latest']
+        config:
+          - platform: 'linux/amd64'
+            os: 'ubuntu-latest'
+          - platform: 'windows/amd64'
+            os: 'windows-latest'
+          - platform: 'darwin/universal'
+            os: 'macos-latest'
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.config.os }}
     steps:
       # Step 1: Checkout code
       - name: Checkout code
@@ -31,7 +36,24 @@ jobs:
         with:
           go-version: '1.22'
 
-      # Step 3: Set up Node.js
+      # Step 3: Install Linux dependencies
+      - name: Install Linux dependencies
+        if: matrix.config.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libgtk-3-dev libwebkit2gtk-4.0-dev
+
+      # Step 4: Install Windows dependencies
+      - name: Install Windows dependencies
+        if: matrix.config.os == 'windows-latest'
+        run: choco install -y mingw
+
+      # Step 5: Install macOS dependencies
+      - name: Install macOS dependencies
+        if: matrix.config.os == 'macos-latest'
+        run: xcode-select --install || true
+
+      # Step 6: Set up Node.js
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -39,34 +61,34 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
-      # Step 4: Install Wails CLI
+      # Step 7: Install Wails CLI
       - name: Install Wails CLI
         run: go install github.com/wailsapp/wails/v2/cmd/wails@v2.8.0
 
-      # Step 5: Install npm dependencies
+      # Step 8: Install npm dependencies
       - name: Install npm dependencies
         run: |
           cd frontend
           npm ci
           npm run build
 
-      # Step 6: Build Wails app
+      # Step 9: Build Wails app
       - name: Build Wails app
         run: |
-          wails build -platform ${{ matrix.platform }} -o QRCodeGenerator
+          wails build -platform ${{ matrix.config.platform }} -o QRCodeGenerator
         env:
           GO111MODULE: on
 
-      # Step 7: Debug build output
+      # Step 10: Debug build output
       - name: List build output
         run: |
           ls -la build/bin || dir build\bin
         shell: bash {0}
 
-      # Step 8: Upload artifacts
+      # Step 11: Upload artifacts
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: QRCodeGenerator-${{ matrix.platform }}
+          name: QRCodeGenerator-${{ replace(matrix.config.platform, '/', '-') }}
           path: build/bin/*
           if-no-files-found: error
